@@ -1,0 +1,294 @@
+/* AMOLED Flip Clock Styles */
+/* Version: 1.2.0 - Professional AMOLED Dark */
+
+/* Reset and Base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    overflow: hidden;
+    color: #ffffff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+/* Clock Container */
+#clock-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    background: radial-gradient(circle at center, #050505 0%, #000000 100%);
+}
+
+/* Time Display */
+#time-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 40px;
+}
+
+/* Digit Groups */
+.digit-group {
+    display: flex;
+    gap: 8px;
+}
+
+/* Flip Digit Container */
+.flip-digit {
+    position: relative;
+    width: 60px;
+    height: 90px;
+    perspective: 1000px;
+}
+
+/* Responsive sizing for tablets */
+@media (min-width: 768px) {
+    .flip-digit {
+        width: 100px;
+        height: 150px;
+    }
+}
+
+/* Responsive sizing for desktops */
+@media (min-width: 1200px) {
+    .flip-digit {
+        width: 130px;
+        height: 190px;
+    }
+}
+
+/* Common Digit Styles */
+.digit-static, .digit-top, .digit-bottom, .digit-flip-top, .digit-flip-bottom {
+    background: #0a0a0a;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+/* Static background digit */
+.digit-static {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 60px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    border-radius: 8px;
+}
+
+@media (min-width: 768px) {
+    .digit-static { font-size: 100px; border-radius: 12px; }
+}
+
+@media (min-width: 1200px) {
+    .digit-static { font-size: 130px; border-radius: 16px; }
+}
+
+/* Top half */
+.digit-top, .digit-flip-top {
+    position: absolute;
+    width: 100%;
+    height: 50%;
+    left: 0;
+    top: 0;
+    overflow: hidden;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 0.5px solid rgba(0,0,0,0.5);
+}
+
+.digit-top span, .digit-flip-top span {
+    position: absolute;
+    width: 100%;
+    height: 200%;
+    left: 0;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 60px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+/* Bottom half */
+.digit-bottom, .digit-flip-bottom {
+    position: absolute;
+    width: 100%;
+    height: 50%;
+    left: 0;
+    bottom: 0;
+    overflow: hidden;
+    border-radius: 0 0 8px 8px;
+    border-top: 0.5px solid rgba(255,255,255,0.05);
+}
+
+.digit-bottom span, .digit-flip-bottom span {
+    position: absolute;
+    width: 100%;
+    height: 200%;
+    left: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 60px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+/* Flipper settings */
+.digit-flip-top {
+    transform-origin: bottom;
+    z-index: 3;
+    backface-visibility: hidden;
+}
+
+.digit-flip-bottom {
+    transform-origin: top;
+    transform: rotateX(180deg);
+    z-index: 2;
+    backface-visibility: hidden;
+}
+
+@media (min-width: 768px) {
+    .digit-top span, .digit-flip-top span, .digit-bottom span, .digit-flip-bottom span { font-size: 100px; }
+    .digit-top, .digit-flip-top { border-radius: 12px 12px 0 0; }
+    .digit-bottom, .digit-flip-bottom { border-radius: 0 0 12px 12px; }
+}
+
+@media (min-width: 1200px) {
+    .digit-top span, .digit-flip-top span, .digit-bottom span, .digit-flip-bottom span { font-size: 130px; }
+    .digit-top, .digit-flip-top { border-radius: 16px 16px 0 0; }
+    .digit-bottom, .digit-flip-bottom { border-radius: 0 0 16px 16px; }
+}
+
+
+/* Flip Animations */
+.flip-digit.flipping .digit-flip-top {
+    animation: flipTop 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.flip-digit.flipping .digit-flip-bottom {
+    animation: flipBottom 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes flipTop {
+    0% { transform: rotateX(0deg); background: #0a0a0a; }
+    50% { background: #1a1a1a; }
+    100% { transform: rotateX(-180deg); background: #0a0a0a; }
+}
+
+@keyframes flipBottom {
+    0% { transform: rotateX(180deg); background: #050505; }
+    50% { background: #1a1a1a; }
+    100% { transform: rotateX(0deg); background: #0a0a0a; }
+}
+
+/* Colon Separators */
+.colon {
+    font-size: 60px;
+    font-weight: 800;
+    color: #ffffff;
+    opacity: 0.6;
+    animation: blink 1.5s ease-in-out infinite;
+    text-shadow: 0 0 20px rgba(255,255,255,0.2);
+}
+
+@media (min-width: 768px) { .colon { font-size: 100px; } }
+@media (min-width: 1200px) { .colon { font-size: 130px; } }
+
+@keyframes blink {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 0.1; }
+}
+
+/* AM/PM Indicator */
+#ampm {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-left: 15px;
+    align-self: flex-end;
+    margin-bottom: 25px;
+    opacity: 0.4;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+@media (min-width: 768px) { #ampm { font-size: 28px; margin-bottom: 40px; } }
+@media (min-width: 1200px) { #ampm { font-size: 34px; margin-bottom: 50px; } }
+
+/* Date Display */
+#date-display {
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    opacity: 0.3;
+    text-align: center;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    transition: opacity 0.3s;
+}
+
+#date-display:hover {
+    opacity: 0.6;
+}
+
+@media (min-width: 768px) { #date-display { font-size: 18px; letter-spacing: 6px; } }
+@media (min-width: 1200px) { #date-display { font-size: 22px; letter-spacing: 8px; } }
+
+/* Wake Lock Indicator */
+#wake-lock-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00ff00;
+    opacity: 0;
+    transition: all 0.5s ease;
+    box-shadow: 0 0 10px #00ff00;
+}
+
+#wake-lock-indicator.active {
+    opacity: 0.4;
+}
+
+/* UI Elegance */
+#clock-container::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.4) 100%);
+    pointer-events: none;
+}
+
