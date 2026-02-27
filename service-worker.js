@@ -1,12 +1,21 @@
 // AMOLED Flip Clock Service Worker
-// Version: 1.0.0
+// Version: 2.0.0
 
-const CACHE_NAME = 'flip-clock-v1.0.0';
+const CACHE_NAME = 'flip-clock-v2.0.0';
 const STATIC_ASSETS = [
     './',
     './index.html',
-    './manifest.json'
+    './manifest.json',
+    './style.css',
+    './script.js',
+    'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap',
+    'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2'
 ];
+
+// Create icon URLs dynamically
+for (let size of [192, 512]) {
+    STATIC_ASSETS.push(`./icons/icon-${size}.png`);
+}
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -51,17 +60,18 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch event - cache first strategy
+// Fetch event - cache first with network fallback
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     
     // Skip non-GET requests
-    if (request.method !== 'GET') {
-        return;
-    }
+    if (request.method !== 'GET') return;
     
-    // Skip cross-origin requests
-    if (!request.url.startsWith(self.location.origin)) {
+    // Skip cross-origin requests except fonts
+    const url = new URL(request.url);
+    if (!url.origin.includes(self.location.origin) && 
+        !url.origin.includes('fonts.googleapis.com') && 
+        !url.origin.includes('fonts.gstatic.com')) {
         return;
     }
     
@@ -70,7 +80,7 @@ self.addEventListener('fetch', (event) => {
             .then((cachedResponse) => {
                 // Return cached response if found
                 if (cachedResponse) {
-                    // Fetch in background to update cache
+                    // Update cache in background for next time
                     fetch(request)
                         .then((networkResponse) => {
                             if (networkResponse && networkResponse.status === 200) {
@@ -80,9 +90,7 @@ self.addEventListener('fetch', (event) => {
                                     });
                             }
                         })
-                        .catch(() => {
-                            // Network fetch failed, but we have cached response
-                        });
+                        .catch(() => {});
                     
                     return cachedResponse;
                 }
@@ -113,25 +121,15 @@ self.addEventListener('fetch', (event) => {
                             return caches.match('./index.html');
                         }
                         
-                        throw error;
+                        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
                     });
             })
     );
 });
 
-// Message event - handle messages from clients
+// Handle messages from clients
 self.addEventListener('message', (event) => {
     if (event.data === 'skipWaiting') {
         self.skipWaiting();
     }
-});
-
-// Sync event - background sync (if supported)
-self.addEventListener('sync', (event) => {
-    console.log('[Service Worker] Background sync:', event.tag);
-});
-
-// Push event - push notifications (if supported)
-self.addEventListener('push', (event) => {
-    console.log('[Service Worker] Push received:', event);
 });
