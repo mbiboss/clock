@@ -1,6 +1,6 @@
 /**
  * AMOLED Flip Clock
- * Version: 1.0.0
+ * Version: 2.0.0
  * Pure Vanilla JavaScript - No Dependencies
  */
 
@@ -11,19 +11,20 @@
     // Configuration
     // ============================================
     const CONFIG = {
-        animationDuration: 600, // ms
+        animationDuration: 500, // ms
         updateInterval: 1000,   // ms
-        cacheVersion: '1.2.0'
+        cacheVersion: '2.0.0'
     };
 
     // ============================================
     // State Management
     // ============================================
     const state = {
-        previousTime: { h1: '0', h2: '0', m1: '0', m2: '0', s1: '0', s2: '0' },
         wakeLock: null,
         isFullscreen: false,
-        isInitialized: false
+        isInitialized: false,
+        deferredPrompt: null,
+        installBannerVisible: false
     };
 
     // ============================================
@@ -36,42 +37,26 @@
         ampm: null,
         date: null,
         wakeLockIndicator: null,
-        rotateMessage: null,
-        clockContainer: null
+        clockContainer: null,
+        installBanner: null,
+        installButton: null,
+        closeInstall: null
     };
 
     // ============================================
     // Date/Time Constants
     // ============================================
-    const DAY_NAMES = [
-        'Sunday', 'Monday', 'Tuesday', 'Wednesday', 
-        'Thursday', 'Friday', 'Saturday'
-    ];
-
-    const MONTH_NAMES = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-    ];
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     // ============================================
     // Utility Functions
     // ============================================
     
-    /**
-     * Pad number with leading zero
-     * @param {number} num - Number to pad
-     * @returns {string} Padded number
-     */
     function pad(num) {
         return num < 10 ? '0' + num : num.toString();
     }
 
-    /**
-     * Debounce function calls
-     * @param {Function} func - Function to debounce
-     * @param {number} wait - Wait time in ms
-     * @returns {Function} Debounced function
-     */
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -88,11 +73,6 @@
     // Flip Animation
     // ============================================
     
-    /**
-     * Update a single digit with flip animation
-     * @param {HTMLElement} digitElement - The digit container element
-     * @param {string} newValue - New digit value
-     */
     function updateDigit(digitElement, newValue) {
         if (!digitElement) return;
         
@@ -107,6 +87,11 @@
 
         if (!staticEl || !topEl || !bottomEl || !flipTopEl || !flipBottomEl) return;
 
+        // Cancel any ongoing animation
+        if (digitElement._animationTimeout) {
+            clearTimeout(digitElement._animationTimeout);
+        }
+
         // Set up flip animation values
         flipTopEl.textContent = currentValue;
         flipBottomEl.textContent = newValue;
@@ -117,7 +102,7 @@
         digitElement.classList.add('flipping');
 
         // Update static value after animation completes
-        setTimeout(() => {
+        digitElement._animationTimeout = setTimeout(() => {
             staticEl.textContent = newValue;
             topEl.textContent = newValue;
             bottomEl.textContent = newValue;
@@ -125,6 +110,7 @@
             flipBottomEl.textContent = newValue;
             digitElement.classList.remove('flipping');
             digitElement.dataset.digit = newValue;
+            delete digitElement._animationTimeout;
         }, CONFIG.animationDuration);
     }
 
@@ -132,9 +118,6 @@
     // Clock Logic
     // ============================================
     
-    /**
-     * Update the clock display
-     */
     function updateClock() {
         const now = new Date();
         let hours = now.getHours();
@@ -153,30 +136,20 @@
         const minutesStr = pad(minutes);
         const secondsStr = pad(seconds);
 
-        // Extract individual digits
-        const timeData = {
-            h1: hoursStr[0],
-            h2: hoursStr[1],
-            m1: minutesStr[0],
-            m2: minutesStr[1],
-            s1: secondsStr[0],
-            s2: secondsStr[1]
-        };
-
         // Update digit elements
         if (elements.hoursDigits) {
-            updateDigit(elements.hoursDigits[0], timeData.h1);
-            updateDigit(elements.hoursDigits[1], timeData.h2);
+            updateDigit(elements.hoursDigits[0], hoursStr[0]);
+            updateDigit(elements.hoursDigits[1], hoursStr[1]);
         }
 
         if (elements.minutesDigits) {
-            updateDigit(elements.minutesDigits[0], timeData.m1);
-            updateDigit(elements.minutesDigits[1], timeData.m2);
+            updateDigit(elements.minutesDigits[0], minutesStr[0]);
+            updateDigit(elements.minutesDigits[1], minutesStr[1]);
         }
 
         if (elements.secondsDigits) {
-            updateDigit(elements.secondsDigits[0], timeData.s1);
-            updateDigit(elements.secondsDigits[1], timeData.s2);
+            updateDigit(elements.secondsDigits[0], secondsStr[0]);
+            updateDigit(elements.secondsDigits[1], secondsStr[1]);
         }
 
         // Update AM/PM
@@ -186,15 +159,8 @@
 
         // Update date
         updateDate(now);
-
-        // Store current time
-        state.previousTime = timeData;
     }
 
-    /**
-     * Update the date display
-     * @param {Date} date - Date object
-     */
     function updateDate(date) {
         if (!elements.date) return;
 
@@ -214,9 +180,6 @@
     // Wake Lock API
     // ============================================
     
-    /**
-     * Request screen wake lock
-     */
     async function requestWakeLock() {
         if (!('wakeLock' in navigator)) {
             console.log('[Flip Clock] Wake Lock API not supported');
@@ -224,6 +187,11 @@
         }
 
         try {
+            // Release existing wake lock if any
+            if (state.wakeLock) {
+                await state.wakeLock.release();
+            }
+
             state.wakeLock = await navigator.wakeLock.request('screen');
             
             if (elements.wakeLockIndicator) {
@@ -244,14 +212,10 @@
         }
     }
 
-    /**
-     * Release wake lock
-     */
     async function releaseWakeLock() {
         if (state.wakeLock) {
             try {
                 await state.wakeLock.release();
-                state.wakeLock = null;
             } catch (err) {
                 console.error('[Flip Clock] Wake Lock release failed:', err);
             }
@@ -262,43 +226,45 @@
     // Fullscreen
     // ============================================
     
-    /**
-     * Enter fullscreen mode
-     */
     function enterFullscreen() {
         const elem = document.documentElement;
         
-        if (elem.requestFullscreen) {
-            elem.requestFullscreen().catch(err => {
+        const requestFS = elem.requestFullscreen || 
+                         elem.webkitRequestFullscreen || 
+                         elem.mozRequestFullScreen || 
+                         elem.msRequestFullscreen;
+
+        if (requestFS) {
+            requestFS.call(elem).catch(err => {
                 console.log('[Flip Clock] Fullscreen request failed:', err);
             });
-        } else if (elem.webkitRequestFullscreen) {
-            elem.webkitRequestFullscreen();
-        } else if (elem.msRequestFullscreen) {
-            elem.msRequestFullscreen();
+        }
+        
+        // Attempt to lock orientation to landscape
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
         }
         
         state.isFullscreen = true;
     }
 
-    /**
-     * Exit fullscreen mode
-     */
     function exitFullscreen() {
-        if (document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-        } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-        } else if (document.msExitFullscreen) {
-            document.msExitFullscreen();
+        const exitFS = document.exitFullscreen || 
+                      document.webkitExitFullscreen || 
+                      document.mozCancelFullScreen || 
+                      document.msExitFullscreen;
+
+        if (exitFS) {
+            exitFS.call(document).catch(() => {});
+        }
+        
+        if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
         }
         
         state.isFullscreen = false;
     }
 
-    /**
-     * Toggle fullscreen mode
-     */
     function toggleFullscreen() {
         if (state.isFullscreen) {
             exitFullscreen();
@@ -308,13 +274,71 @@
     }
 
     // ============================================
+    // PWA Installation
+    // ============================================
+    
+    function setupInstallPrompt() {
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            state.deferredPrompt = e;
+            
+            if (elements.installBanner) {
+                elements.installBanner.classList.remove('hidden');
+                state.installBannerVisible = true;
+            }
+        });
+
+        if (elements.installButton) {
+            elements.installButton.addEventListener('click', async () => {
+                if (!state.deferredPrompt) return;
+                
+                elements.installButton.disabled = true;
+                
+                try {
+                    state.deferredPrompt.prompt();
+                    const { outcome } = await state.deferredPrompt.userChoice;
+                    console.log(`[Flip Clock] Install prompt outcome: ${outcome}`);
+                    
+                    if (outcome === 'accepted') {
+                        // Hide banner after successful installation
+                        if (elements.installBanner) {
+                            elements.installBanner.classList.add('hidden');
+                        }
+                    }
+                } catch (err) {
+                    console.error('[Flip Clock] Install prompt failed:', err);
+                } finally {
+                    state.deferredPrompt = null;
+                    elements.installButton.disabled = false;
+                }
+            });
+        }
+
+        if (elements.closeInstall) {
+            elements.closeInstall.addEventListener('click', () => {
+                if (elements.installBanner) {
+                    elements.installBanner.classList.add('hidden');
+                    state.installBannerVisible = false;
+                }
+            });
+        }
+
+        // Hide banner if app is already installed
+        window.addEventListener('appinstalled', () => {
+            console.log('[Flip Clock] App was installed');
+            if (elements.installBanner) {
+                elements.installBanner.classList.add('hidden');
+                state.installBannerVisible = false;
+            }
+            state.deferredPrompt = null;
+        });
+    }
+
+    // ============================================
     // Event Handlers
     // ============================================
     
-    /**
-     * Handle first user interaction
-     */
-    function handleFirstInteraction() {
+    function handleFirstInteraction(e) {
         // Fullscreen activation
         enterFullscreen();
         
@@ -327,34 +351,20 @@
         document.removeEventListener('keydown', handleFirstInteraction);
     }
 
-    /**
-     * Handle visibility change
-     */
     function handleVisibilityChange() {
         if (document.visibilityState === 'visible') {
-            // Re-request wake lock when page becomes visible
             if (!state.wakeLock) {
                 requestWakeLock();
             }
-            // Update clock immediately
+            // Update clock immediately when becoming visible
             updateClock();
         }
     }
 
-    /**
-     * Handle orientation change
-     */
-    function handleOrientationChange() {
-        // Force redraw after orientation change
-        setTimeout(() => {
-            window.scrollTo(0, 0);
-        }, 100);
+    function handleFullscreenChange() {
+        state.isFullscreen = !!document.fullscreenElement;
     }
 
-    /**
-     * Prevent default behavior for various events
-     * @param {Event} e - Event object
-     */
     function preventDefault(e) {
         e.preventDefault();
     }
@@ -363,28 +373,36 @@
     // Service Worker
     // ============================================
     
-    /**
-     * Register service worker
-     */
     function registerServiceWorker() {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js')
-                .then(registration => {
-                    console.log('[Flip Clock] Service Worker registered:', registration.scope);
-                    
-                    // Check for updates
-                    registration.addEventListener('updatefound', () => {
-                        const newWorker = registration.installing;
-                        newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                console.log('[Flip Clock] New version available');
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('[Flip Clock] Service Worker registered:', registration.scope);
+                        
+                        // Check for updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            if (newWorker) {
+                                newWorker.addEventListener('statechange', () => {
+                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        console.log('[Flip Clock] New version available');
+                                        // Notify user of update if needed
+                                    }
+                                });
                             }
                         });
+                    })
+                    .catch(error => {
+                        console.error('[Flip Clock] Service Worker registration failed:', error);
                     });
-                })
-                .catch(error => {
-                    console.error('[Flip Clock] Service Worker registration failed:', error);
+
+                // Handle controller change (new service worker activated)
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    console.log('[Flip Clock] Service Worker controller changed');
+                    window.location.reload();
                 });
+            });
         }
     }
 
@@ -392,9 +410,6 @@
     // Initialization
     // ============================================
     
-    /**
-     * Cache DOM elements
-     */
     function cacheElements() {
         elements.hoursDigits = document.querySelectorAll('#hours .flip-digit');
         elements.minutesDigits = document.querySelectorAll('#minutes .flip-digit');
@@ -402,27 +417,28 @@
         elements.ampm = document.getElementById('ampm');
         elements.date = document.getElementById('date-display');
         elements.wakeLockIndicator = document.getElementById('wake-lock-indicator');
-        elements.rotateMessage = document.getElementById('rotate-message');
         elements.clockContainer = document.getElementById('clock-container');
+        elements.installBanner = document.getElementById('install-banner');
+        elements.installButton = document.getElementById('install-button');
+        elements.closeInstall = document.getElementById('close-install');
     }
 
-    /**
-     * Setup event listeners
-     */
     function setupEventListeners() {
         // First interaction for fullscreen and wake lock
-        document.addEventListener('click', handleFirstInteraction);
-        document.addEventListener('touchstart', handleFirstInteraction);
-        document.addEventListener('keydown', handleFirstInteraction);
+        document.addEventListener('click', handleFirstInteraction, { once: true });
+        document.addEventListener('touchstart', handleFirstInteraction, { once: true });
+        document.addEventListener('keydown', handleFirstInteraction, { once: true });
 
         // Visibility change for wake lock re-acquisition
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Orientation change
-        window.addEventListener('orientationchange', handleOrientationChange);
-        window.addEventListener('resize', debounce(handleOrientationChange, 250));
+        // Fullscreen change
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-        // Prevent scrolling
+        // Prevent scrolling and gestures
         document.addEventListener('wheel', preventDefault, { passive: false });
         document.addEventListener('touchmove', preventDefault, { passive: false });
         document.addEventListener('gesturestart', preventDefault);
@@ -443,11 +459,41 @@
             }
             lastTap = currentTime;
         });
+
+        // Handle resize events
+        window.addEventListener('resize', debounce(() => {
+            // Force redraw
+            document.body.style.display = 'none';
+            document.body.offsetHeight; // Trigger reflow
+            document.body.style.display = 'flex';
+        }, 250));
     }
 
-    /**
-     * Initialize the clock
-     */
+    function setInitialTime() {
+        const now = new Date();
+        let hours = now.getHours();
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        
+        const hoursStr = pad(hours);
+        const minutesStr = pad(now.getMinutes());
+        const secondsStr = pad(now.getSeconds());
+
+        // Set initial digit values
+        if (elements.hoursDigits) {
+            elements.hoursDigits[0].dataset.digit = hoursStr[0];
+            elements.hoursDigits[1].dataset.digit = hoursStr[1];
+        }
+        if (elements.minutesDigits) {
+            elements.minutesDigits[0].dataset.digit = minutesStr[0];
+            elements.minutesDigits[1].dataset.digit = minutesStr[1];
+        }
+        if (elements.secondsDigits) {
+            elements.secondsDigits[0].dataset.digit = secondsStr[0];
+            elements.secondsDigits[1].dataset.digit = secondsStr[1];
+        }
+    }
+
     function init() {
         if (state.isInitialized) return;
 
@@ -456,11 +502,17 @@
         // Cache DOM elements
         cacheElements();
 
+        // Set initial time values
+        setInitialTime();
+
         // Setup event listeners
         setupEventListeners();
 
         // Register service worker
         registerServiceWorker();
+
+        // Setup PWA install prompt
+        setupInstallPrompt();
 
         // Initial clock update
         updateClock();
@@ -476,7 +528,6 @@
     // Start
     // ============================================
     
-    // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
