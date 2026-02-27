@@ -1,40 +1,55 @@
 {
-  "name": "AMOLED Flip Clock",
+  "name": "AMOLED Flip Clock Pro",
   "short_name": "Flip Clock",
-  "description": "A minimalist AMOLED digital flip clock with realistic animations",
-  "start_url": ".",
+  "description": "Professional AMOLED digital flip clock with smooth animations",
+  "start_url": "/",
   "display": "fullscreen",
-  "display_override": ["fullscreen", "standalone"],
   "orientation": "landscape",
   "background_color": "#000000",
   "theme_color": "#000000",
-  "scope": ".",
-  "lang": "en",
-  "dir": "ltr",
-  "categories": ["utilities", "productivity"],
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%23000' width='192' height='192'/%3E%3Ctext x='96' y='120' font-size='80' fill='%23fff' text-anchor='middle' font-family='Arial' font-weight='bold'%3E12%3C/text%3E%3C/svg%3E",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%23000' width='512' height='512'/%3E%3Ctext x='256' y='320' font-size='200' fill='%23fff' text-anchor='middle' font-family='Arial' font-weight='bold'%3E12%3C/text%3E%3C/svg%3E",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
   "screenshots": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720'%3E%3Crect fill='%23000' width='1280' height='720'/%3E%3Ctext x='640' y='380' font-size='120' fill='%23fff' text-anchor='middle' font-family='Arial' font-weight='bold'%3E12:00:00 AM%3C/text%3E%3C/svg%3E",
+      "src": "screenshots/desktop.png",
       "sizes": "1280x720",
-      "type": "image/svg+xml",
-      "form_factor": "wide"
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "AMOLED Flip Clock in landscape mode"
+    },
+    {
+      "src": "screenshots/mobile.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "AMOLED Flip Clock on mobile"
     }
   ],
-  "shortcuts": [],
-  "related_applications": [],
-  "prefer_related_applications": false
+  "shortcuts": [
+    {
+      "name": "Open Clock",
+      "short_name": "Clock",
+      "description": "Open the flip clock",
+      "url": "/",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
 }
