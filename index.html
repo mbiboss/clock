@@ -2,101 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#000000">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AMOLED Flip Clock">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="AMOLED Flip Clock">
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <title>Flip Clock</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    <title>AMOLED Flip Clock</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 </head>
 <body>
-    <div id="clock-container">
-        <div id="time-display">
-            <div class="digit-group" id="hours">
-                <div class="flip-digit" data-digit="1">
-                    <div class="digit-static">1</div>
-                    <div class="digit-top"><span>1</span></div>
-                    <div class="digit-bottom"><span>1</span></div>
-                    <div class="digit-flip-top"><span>1</span></div>
-                    <div class="digit-flip-bottom"><span>1</span></div>
-                </div>
-                <div class="flip-digit" data-digit="2">
-                    <div class="digit-static">2</div>
-                    <div class="digit-top"><span>2</span></div>
-                    <div class="digit-bottom"><span>2</span></div>
-                    <div class="digit-flip-top"><span>2</span></div>
-                    <div class="digit-flip-bottom"><span>2</span></div>
+    <div class="clock-container">
+        <div class="clock-wrapper">
+            <div class="time-row">
+                <div class="time-group" id="hours-group"></div>
+                <div class="colon"></div>
+                <div class="time-group" id="minutes-group"></div>
+                <div class="colon"></div>
+                <div class="time-group" id="seconds-group"></div>
+                <div class="ampm-box">
+                    <span id="ampm">AM</span>
                 </div>
             </div>
-            
-            <div class="colon">:</div>
-            
-            <div class="digit-group" id="minutes">
-                <div class="flip-digit" data-digit="0">
-                    <div class="digit-static">0</div>
-                    <div class="digit-top"><span>0</span></div>
-                    <div class="digit-bottom"><span>0</span></div>
-                    <div class="digit-flip-top"><span>0</span></div>
-                    <div class="digit-flip-bottom"><span>0</span></div>
-                </div>
-                <div class="flip-digit" data-digit="0">
-                    <div class="digit-static">0</div>
-                    <div class="digit-top"><span>0</span></div>
-                    <div class="digit-bottom"><span>0</span></div>
-                    <div class="digit-flip-top"><span>0</span></div>
-                    <div class="digit-flip-bottom"><span>0</span></div>
-                </div>
-            </div>
-            
-            <div class="colon">:</div>
-            
-            <div class="digit-group" id="seconds">
-                <div class="flip-digit" data-digit="0">
-                    <div class="digit-static">0</div>
-                    <div class="digit-top"><span>0</span></div>
-                    <div class="digit-bottom"><span>0</span></div>
-                    <div class="digit-flip-top"><span>0</span></div>
-                    <div class="digit-flip-bottom"><span>0</span></div>
-                </div>
-                <div class="flip-digit" data-digit="0">
-                    <div class="digit-static">0</div>
-                    <div class="digit-top"><span>0</span></div>
-                    <div class="digit-bottom"><span>0</span></div>
-                    <div class="digit-flip-top"><span>0</span></div>
-                    <div class="digit-flip-bottom"><span>0</span></div>
-                </div>
-            </div>
-            
-            <div id="ampm">AM</div>
+            <div class="date-row" id="date-display"></div>
         </div>
-        
-        <div id="date-display">Monday, 1 January 2024</div>
     </div>
-    
-    <div id="wake-lock-indicator"></div>
-    
-    <!-- PWA Install Prompt -->
-    <div id="install-banner" class="hidden">
+
+    <!-- Install Popup Modal -->
+    <div class="install-modal" id="install-modal">
         <div class="install-content">
-            <div class="install-text">
-                <strong>AMOLED Flip Clock Pro</strong>
-                <span>Install for offline use & best experience</span>
+            <h3>Install Flip Clock</h3>
+            <p>Add this app to your device for a fullscreen, offline experience.</p>
+            <div class="install-actions">
+                <button id="btn-cancel" class="btn btn-cancel">Cancel</button>
+                <button id="btn-install" class="btn btn-install">Install Clock</button>
             </div>
-            <button id="install-button">Install</button>
-            <button id="close-install" aria-label="Close">✕</button>
         </div>
     </div>
-    
+
     <script src="script.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').then(reg => {
+            console.log('SW registered: ', reg.scope);
+          }).catch(err => console.log('SW registration failed: ', err));
+        });
+      }
+    </script>
 </body>
 </html>

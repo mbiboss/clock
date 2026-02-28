@@ -1,546 +1,185 @@
-/**
- * AMOLED Flip Clock
- * Version: 2.0.0
- * Pure Vanilla JavaScript - No Dependencies
- */
+document.addEventListener('DOMContentLoaded', () => {
+    const hoursGroup = document.getElementById('hours-group');
+    const minutesGroup = document.getElementById('minutes-group');
+    const secondsGroup = document.getElementById('seconds-group');
+    const ampmDisplay = document.getElementById('ampm');
+    const dateDisplay = document.getElementById('date-display');
+    const installModal = document.getElementById('install-modal');
+    const btnInstall = document.getElementById('btn-install');
+    const btnCancel = document.getElementById('btn-cancel');
+    const clockContainer = document.querySelector('.clock-container');
 
-(function() {
-    'use strict';
-
-    // ============================================
-    // Configuration
-    // ============================================
-    const CONFIG = {
-        animationDuration: 500, // ms
-        updateInterval: 1000,   // ms
-        cacheVersion: '2.0.0'
-    };
-
-    // ============================================
-    // State Management
-    // ============================================
-    const state = {
-        wakeLock: null,
-        isFullscreen: false,
-        isInitialized: false,
-        deferredPrompt: null,
-        installBannerVisible: false
-    };
-
-    // ============================================
-    // DOM Elements Cache
-    // ============================================
-    const elements = {
-        hoursDigits: null,
-        minutesDigits: null,
-        secondsDigits: null,
-        ampm: null,
-        date: null,
-        wakeLockIndicator: null,
-        clockContainer: null,
-        installBanner: null,
-        installButton: null,
-        closeInstall: null
-    };
-
-    // ============================================
-    // Date/Time Constants
-    // ============================================
-    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-    // ============================================
-    // Utility Functions
-    // ============================================
-    
-    function pad(num) {
-        return num < 10 ? '0' + num : num.toString();
-    }
-
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    // ============================================
-    // Flip Animation
-    // ============================================
-    
-    function updateDigit(digitElement, newValue) {
-        if (!digitElement) return;
-        
-        const currentValue = digitElement.dataset.digit;
-        if (currentValue === newValue) return;
-
-        const staticEl = digitElement.querySelector('.digit-static');
-        const topEl = digitElement.querySelector('.digit-top span');
-        const bottomEl = digitElement.querySelector('.digit-bottom span');
-        const flipTopEl = digitElement.querySelector('.digit-flip-top span');
-        const flipBottomEl = digitElement.querySelector('.digit-flip-bottom span');
-
-        if (!staticEl || !topEl || !bottomEl || !flipTopEl || !flipBottomEl) return;
-
-        // Cancel any ongoing animation
-        if (digitElement._animationTimeout) {
-            clearTimeout(digitElement._animationTimeout);
-        }
-
-        // Set up flip animation values
-        flipTopEl.textContent = currentValue;
-        flipBottomEl.textContent = newValue;
-        topEl.textContent = currentValue;
-        bottomEl.textContent = newValue;
-
-        // Start animation
-        digitElement.classList.add('flipping');
-
-        // Update static value after animation completes
-        digitElement._animationTimeout = setTimeout(() => {
-            staticEl.textContent = newValue;
-            topEl.textContent = newValue;
-            bottomEl.textContent = newValue;
-            flipTopEl.textContent = newValue;
-            flipBottomEl.textContent = newValue;
-            digitElement.classList.remove('flipping');
-            digitElement.dataset.digit = newValue;
-            delete digitElement._animationTimeout;
-        }, CONFIG.animationDuration);
-    }
-
-    // ============================================
-    // Clock Logic
-    // ============================================
-    
-    function updateClock() {
-        const now = new Date();
-        let hours = now.getHours();
-        const minutes = now.getMinutes();
-        const seconds = now.getSeconds();
-
-        // Determine AM/PM
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        
-        // Convert to 12-hour format
-        hours = hours % 12;
-        hours = hours ? hours : 12;
-
-        // Format digits
-        const hoursStr = pad(hours);
-        const minutesStr = pad(minutes);
-        const secondsStr = pad(seconds);
-
-        // Update digit elements
-        if (elements.hoursDigits) {
-            updateDigit(elements.hoursDigits[0], hoursStr[0]);
-            updateDigit(elements.hoursDigits[1], hoursStr[1]);
-        }
-
-        if (elements.minutesDigits) {
-            updateDigit(elements.minutesDigits[0], minutesStr[0]);
-            updateDigit(elements.minutesDigits[1], minutesStr[1]);
-        }
-
-        if (elements.secondsDigits) {
-            updateDigit(elements.secondsDigits[0], secondsStr[0]);
-            updateDigit(elements.secondsDigits[1], secondsStr[1]);
-        }
-
-        // Update AM/PM
-        if (elements.ampm && elements.ampm.textContent !== ampm) {
-            elements.ampm.textContent = ampm;
-        }
-
-        // Update date
-        updateDate(now);
-    }
-
-    function updateDate(date) {
-        if (!elements.date) return;
-
-        const dayName = DAY_NAMES[date.getDay()];
-        const day = date.getDate();
-        const monthName = MONTH_NAMES[date.getMonth()];
-        const year = date.getFullYear();
-        
-        const dateString = `${dayName}, ${day} ${monthName} ${year}`;
-
-        if (elements.date.textContent !== dateString) {
-            elements.date.textContent = dateString;
-        }
-    }
-
-    // ============================================
-    // Wake Lock API
-    // ============================================
-    
-    async function requestWakeLock() {
-        if (!('wakeLock' in navigator)) {
-            console.log('[Flip Clock] Wake Lock API not supported');
-            return;
-        }
-
-        try {
-            // Release existing wake lock if any
-            if (state.wakeLock) {
-                await state.wakeLock.release();
-            }
-
-            state.wakeLock = await navigator.wakeLock.request('screen');
-            
-            if (elements.wakeLockIndicator) {
-                elements.wakeLockIndicator.classList.add('active');
-            }
-            
-            console.log('[Flip Clock] Wake Lock active');
-
-            state.wakeLock.addEventListener('release', () => {
-                if (elements.wakeLockIndicator) {
-                    elements.wakeLockIndicator.classList.remove('active');
-                }
-                console.log('[Flip Clock] Wake Lock released');
-                state.wakeLock = null;
+    // Click to toggle fullscreen
+    clockContainer.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
             });
-        } catch (err) {
-            console.error('[Flip Clock] Wake Lock request failed:', err);
-        }
-    }
-
-    async function releaseWakeLock() {
-        if (state.wakeLock) {
-            try {
-                await state.wakeLock.release();
-            } catch (err) {
-                console.error('[Flip Clock] Wake Lock release failed:', err);
-            }
-        }
-    }
-
-    // ============================================
-    // Fullscreen
-    // ============================================
-    
-    function enterFullscreen() {
-        const elem = document.documentElement;
-        
-        const requestFS = elem.requestFullscreen || 
-                         elem.webkitRequestFullscreen || 
-                         elem.mozRequestFullScreen || 
-                         elem.msRequestFullscreen;
-
-        if (requestFS) {
-            requestFS.call(elem).catch(err => {
-                console.log('[Flip Clock] Fullscreen request failed:', err);
-            });
-        }
-        
-        // Attempt to lock orientation to landscape
-        if (screen.orientation && screen.orientation.lock) {
-            screen.orientation.lock('landscape').catch(() => {});
-        }
-        
-        state.isFullscreen = true;
-    }
-
-    function exitFullscreen() {
-        const exitFS = document.exitFullscreen || 
-                      document.webkitExitFullscreen || 
-                      document.mozCancelFullScreen || 
-                      document.msExitFullscreen;
-
-        if (exitFS) {
-            exitFS.call(document).catch(() => {});
-        }
-        
-        if (screen.orientation && screen.orientation.unlock) {
-            screen.orientation.unlock();
-        }
-        
-        state.isFullscreen = false;
-    }
-
-    function toggleFullscreen() {
-        if (state.isFullscreen) {
-            exitFullscreen();
         } else {
-            enterFullscreen();
-        }
-    }
-
-    // ============================================
-    // PWA Installation
-    // ============================================
-    
-    function setupInstallPrompt() {
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            state.deferredPrompt = e;
-            
-            if (elements.installBanner) {
-                elements.installBanner.classList.remove('hidden');
-                state.installBannerVisible = true;
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
             }
-        });
-
-        if (elements.installButton) {
-            elements.installButton.addEventListener('click', async () => {
-                if (!state.deferredPrompt) return;
-                
-                elements.installButton.disabled = true;
-                
-                try {
-                    state.deferredPrompt.prompt();
-                    const { outcome } = await state.deferredPrompt.userChoice;
-                    console.log(`[Flip Clock] Install prompt outcome: ${outcome}`);
-                    
-                    if (outcome === 'accepted') {
-                        // Hide banner after successful installation
-                        if (elements.installBanner) {
-                            elements.installBanner.classList.add('hidden');
-                        }
-                    }
-                } catch (err) {
-                    console.error('[Flip Clock] Install prompt failed:', err);
-                } finally {
-                    state.deferredPrompt = null;
-                    elements.installButton.disabled = false;
-                }
-            });
         }
+    });
 
-        if (elements.closeInstall) {
-            elements.closeInstall.addEventListener('click', () => {
-                if (elements.installBanner) {
-                    elements.installBanner.classList.add('hidden');
-                    state.installBannerVisible = false;
-                }
-            });
-        }
-
-        // Hide banner if app is already installed
-        window.addEventListener('appinstalled', () => {
-            console.log('[Flip Clock] App was installed');
-            if (elements.installBanner) {
-                elements.installBanner.classList.add('hidden');
-                state.installBannerVisible = false;
+    // Wake Lock to keep screen on
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
             }
-            state.deferredPrompt = null;
-        });
-    }
-
-    // ============================================
-    // Event Handlers
-    // ============================================
+        } catch (err) {
+            console.log('Wake Lock error:', err);
+        }
+    };
     
-    function handleFirstInteraction(e) {
-        // Fullscreen activation
-        enterFullscreen();
-        
-        // Request Wake Lock
-        requestWakeLock();
-        
-        // Remove interaction listeners
-        document.removeEventListener('click', handleFirstInteraction);
-        document.removeEventListener('touchstart', handleFirstInteraction);
-        document.removeEventListener('keydown', handleFirstInteraction);
-    }
-
-    function handleVisibilityChange() {
+    document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            if (!state.wakeLock) {
-                requestWakeLock();
-            }
-            // Update clock immediately when becoming visible
-            updateClock();
+            requestWakeLock();
         }
-    }
+    });
+    requestWakeLock();
 
-    function handleFullscreenChange() {
-        state.isFullscreen = !!document.fullscreenElement;
-    }
-
-    function preventDefault(e) {
+    // PWA Install Prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
-    }
-
-    // ============================================
-    // Service Worker
-    // ============================================
-    
-    function registerServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
-                    .then(registration => {
-                        console.log('[Flip Clock] Service Worker registered:', registration.scope);
-                        
-                        // Check for updates
-                        registration.addEventListener('updatefound', () => {
-                            const newWorker = registration.installing;
-                            if (newWorker) {
-                                newWorker.addEventListener('statechange', () => {
-                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                        console.log('[Flip Clock] New version available');
-                                        // Notify user of update if needed
-                                    }
-                                });
-                            }
-                        });
-                    })
-                    .catch(error => {
-                        console.error('[Flip Clock] Service Worker registration failed:', error);
-                    });
-
-                // Handle controller change (new service worker activated)
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    console.log('[Flip Clock] Service Worker controller changed');
-                    window.location.reload();
-                });
-            });
-        }
-    }
-
-    // ============================================
-    // Initialization
-    // ============================================
-    
-    function cacheElements() {
-        elements.hoursDigits = document.querySelectorAll('#hours .flip-digit');
-        elements.minutesDigits = document.querySelectorAll('#minutes .flip-digit');
-        elements.secondsDigits = document.querySelectorAll('#seconds .flip-digit');
-        elements.ampm = document.getElementById('ampm');
-        elements.date = document.getElementById('date-display');
-        elements.wakeLockIndicator = document.getElementById('wake-lock-indicator');
-        elements.clockContainer = document.getElementById('clock-container');
-        elements.installBanner = document.getElementById('install-banner');
-        elements.installButton = document.getElementById('install-button');
-        elements.closeInstall = document.getElementById('close-install');
-    }
-
-    function setupEventListeners() {
-        // First interaction for fullscreen and wake lock
-        document.addEventListener('click', handleFirstInteraction, { once: true });
-        document.addEventListener('touchstart', handleFirstInteraction, { once: true });
-        document.addEventListener('keydown', handleFirstInteraction, { once: true });
-
-        // Visibility change for wake lock re-acquisition
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        // Fullscreen change
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-
-        // Prevent scrolling and gestures
-        document.addEventListener('wheel', preventDefault, { passive: false });
-        document.addEventListener('touchmove', preventDefault, { passive: false });
-        document.addEventListener('gesturestart', preventDefault);
-        document.addEventListener('gesturechange', preventDefault);
-        document.addEventListener('gestureend', preventDefault);
-
-        // Prevent context menu
-        document.addEventListener('contextmenu', preventDefault);
-
-        // Double tap to toggle fullscreen
-        let lastTap = 0;
-        document.addEventListener('touchend', (e) => {
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            if (tapLength < 300 && tapLength > 0) {
-                toggleFullscreen();
-                e.preventDefault();
-            }
-            lastTap = currentTime;
-        });
-
-        // Handle resize events
-        window.addEventListener('resize', debounce(() => {
-            // Force redraw
-            document.body.style.display = 'none';
-            document.body.offsetHeight; // Trigger reflow
-            document.body.style.display = 'flex';
-        }, 250));
-    }
-
-    function setInitialTime() {
-        const now = new Date();
-        let hours = now.getHours();
-        hours = hours % 12;
-        hours = hours ? hours : 12;
+        deferredPrompt = e;
         
-        const hoursStr = pad(hours);
-        const minutesStr = pad(now.getMinutes());
-        const secondsStr = pad(now.getSeconds());
+        if (!localStorage.getItem('pwa-installed')) {
+            installModal.classList.add('show');
+        }
+    });
 
-        // Set initial digit values
-        if (elements.hoursDigits) {
-            elements.hoursDigits[0].dataset.digit = hoursStr[0];
-            elements.hoursDigits[1].dataset.digit = hoursStr[1];
+    btnInstall.addEventListener('click', async () => {
+        installModal.classList.remove('show');
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                localStorage.setItem('pwa-installed', 'true');
+            }
+            deferredPrompt = null;
         }
-        if (elements.minutesDigits) {
-            elements.minutesDigits[0].dataset.digit = minutesStr[0];
-            elements.minutesDigits[1].dataset.digit = minutesStr[1];
-        }
-        if (elements.secondsDigits) {
-            elements.secondsDigits[0].dataset.digit = secondsStr[0];
-            elements.secondsDigits[1].dataset.digit = secondsStr[1];
-        }
+    });
+
+    btnCancel.addEventListener('click', () => {
+        installModal.classList.remove('show');
+    });
+
+    window.addEventListener('appinstalled', () => {
+        localStorage.setItem('pwa-installed', 'true');
+        installModal.classList.remove('show');
+    });
+
+    // Flip clock logic
+    function createFlipCard(id) {
+        const card = document.createElement('div');
+        card.className = 'flip-card';
+        card.id = id;
+
+        const top = document.createElement('div');
+        top.className = 'top';
+        const topDigit = document.createElement('div');
+        topDigit.className = 'digit';
+        topDigit.innerText = '0';
+        top.appendChild(topDigit);
+
+        const bottom = document.createElement('div');
+        bottom.className = 'bottom';
+        const bottomDigit = document.createElement('div');
+        bottomDigit.className = 'digit';
+        bottomDigit.innerText = '0';
+        bottom.appendChild(bottomDigit);
+
+        card.appendChild(top);
+        card.appendChild(bottom);
+
+        return card;
     }
 
-    function init() {
-        if (state.isInitialized) return;
-
-        console.log('[Flip Clock] Initializing...');
-
-        // Cache DOM elements
-        cacheElements();
-
-        // Set initial time values
-        setInitialTime();
-
-        // Setup event listeners
-        setupEventListeners();
-
-        // Register service worker
-        registerServiceWorker();
-
-        // Setup PWA install prompt
-        setupInstallPrompt();
-
-        // Initial clock update
-        updateClock();
-
-        // Start clock interval
-        setInterval(updateClock, CONFIG.updateInterval);
-
-        state.isInitialized = true;
-        console.log('[Flip Clock] Initialized successfully');
-    }
-
-    // ============================================
-    // Start
-    // ============================================
-    
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-
-    // Expose minimal API for debugging
-    window.FlipClock = {
-        version: CONFIG.cacheVersion,
-        toggleFullscreen,
-        requestWakeLock,
-        releaseWakeLock,
-        updateClock
+    const cards = {
+        h1: createFlipCard('h1'),
+        h2: createFlipCard('h2'),
+        m1: createFlipCard('m1'),
+        m2: createFlipCard('m2'),
+        s1: createFlipCard('s1'),
+        s2: createFlipCard('s2'),
     };
 
-})();
+    hoursGroup.appendChild(cards.h1);
+    hoursGroup.appendChild(cards.h2);
+    minutesGroup.appendChild(cards.m1);
+    minutesGroup.appendChild(cards.m2);
+    secondsGroup.appendChild(cards.s1);
+    secondsGroup.appendChild(cards.s2);
+
+    function flip(card, newNumber) {
+        const topDigit = card.querySelector('.top .digit');
+        const bottomDigit = card.querySelector('.bottom .digit');
+        const currentNumber = topDigit.innerText;
+
+        if (currentNumber === newNumber) return;
+
+        topDigit.innerText = newNumber;
+
+        const flipTop = document.createElement('div');
+        flipTop.className = 'flip-top';
+        const ftDigit = document.createElement('div');
+        ftDigit.className = 'digit';
+        ftDigit.innerText = currentNumber;
+        flipTop.appendChild(ftDigit);
+
+        const flipBottom = document.createElement('div');
+        flipBottom.className = 'flip-bottom';
+        const fbDigit = document.createElement('div');
+        fbDigit.className = 'digit';
+        fbDigit.innerText = newNumber;
+        flipBottom.appendChild(fbDigit);
+
+        card.appendChild(flipTop);
+        card.appendChild(flipBottom);
+
+        setTimeout(() => {
+            bottomDigit.innerText = newNumber;
+            if (card.contains(flipTop)) flipTop.remove();
+            if (card.contains(flipBottom)) flipBottom.remove();
+        }, 650);
+    }
+
+    function updateTime() {
+        const now = new Date();
+        
+        let h = now.getHours();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        
+        const m = now.getMinutes();
+        const s = now.getSeconds();
+
+        const hStr = h.toString().padStart(2, '0');
+        const mStr = m.toString().padStart(2, '0');
+        const sStr = s.toString().padStart(2, '0');
+
+        flip(cards.h1, hStr[0]);
+        flip(cards.h2, hStr[1]);
+        flip(cards.m1, mStr[0]);
+        flip(cards.m2, mStr[1]);
+        flip(cards.s1, sStr[0]);
+        flip(cards.s2, sStr[1]);
+
+        if (ampmDisplay.innerText !== ampm) {
+            ampmDisplay.innerText = ampm;
+        }
+
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dateStr = now.toLocaleDateString('en-US', options).toUpperCase();
+        if (dateDisplay.innerText !== dateStr) {
+            dateDisplay.innerText = dateStr;
+        }
+    }
+
+    updateTime();
+    setInterval(updateTime, 1000);
+});
