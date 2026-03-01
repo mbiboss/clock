@@ -122,7 +122,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentNumber === newNumber) return;
 
-        topDigit.innerText = newNumber;
+        // If a flip is already in progress, don't start a new one
+        if (card.classList.contains('flipping')) return;
+        card.classList.add('flipping');
+
+        // Reset the card state to ensure no leftover elements
+        card.querySelectorAll('.flip-top, .flip-bottom').forEach(el => el.remove());
 
         const flipTop = document.createElement('div');
         flipTop.className = 'flip-top';
@@ -141,11 +146,17 @@ document.addEventListener('DOMContentLoaded', () => {
         card.appendChild(flipTop);
         card.appendChild(flipBottom);
 
+        // Update top half immediately behind the flip
+        // The top half of the background card is updated to the NEW number
+        topDigit.innerText = newNumber;
+
         setTimeout(() => {
+            // Update bottom half of the background card ONLY after animation completes
             bottomDigit.innerText = newNumber;
-            if (card.contains(flipTop)) flipTop.remove();
-            if (card.contains(flipBottom)) flipBottom.remove();
-        }, 650);
+            flipTop.remove();
+            flipBottom.remove();
+            card.classList.remove('flipping');
+        }, 850); // Increased timeout to match slower 0.4s+0.4s animation
     }
 
     function updateTime() {
